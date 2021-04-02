@@ -11,7 +11,7 @@ pipeline {
         {
             steps
             {
-                git url : "https://github.com/Shilpa40/MavenappSourceCode.git"
+                git url : "https://github.com/Shilpa40/ArtifactoryWarfile.git"
             }
         }
         stage('Build')
