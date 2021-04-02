@@ -1,29 +1,102 @@
+  
 pipeline {
-    agent any
+    agent any   
+    environment {
+                    registry = "shilpabains/dock"
+                    registryCredential = 'DockerHub'
+                    dockerImage = ''
+                 }
     stages {
-        stage('SCM') {
-            steps {
-                git url: 'https://github.com/foo/bar.git'
+        stage('Fetch')
+        {
+            steps
+            {
+                git url : "https://github.com/Shilpa40/MavenappSourceCode.git"
             }
         }
-        stage('build && SonarQube analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    // Optionally use a Maven environment you've configured already
-                    withMaven(maven:'Maven 3.6') {
-                        sh 'mvn clean package sonar:sonar'
+        stage('Build')
+        {
+            steps
+            {
+                echo 'Hello World'
+        echo 'Building.....'
+                bat 'mvn clean install'
+            }
+        }
+        stage('Unit Test')
+        {
+            steps
+            {
+        echo 'Testing....'
+                bat 'mvn test'
+            }
+        }
+        stage('Sonar Analysis')
+        {
+            steps
+            {
+        echo 'Sonar Analysis....'
+                withSonarQubeEnv("SonarQube")
+                {
+                    bat "mvn sonar:sonar"
+                }  
+            }
+        }
+        stage('Upload to Artifactory')
+        {
+            steps
+            {
+            echo 'Uploading....'
+                rtMavenDeployer (
+                    id: 'deployer-unique-id',
+                    serverId: 'Artifactory',
+                    releaseRepo: 'example-repo-local',
+                    snapshotRepo: 'example-repo-local'
+                )
+                rtMavenRun (
+                pom: 'pom.xml',
+                goals: 'clean install',
+                deployerId: 'deployer-unique-id'
+                )
+                rtPublishBuildInfo (
+                    serverId: 'Artifactory'
+                        )
+            }
+        }
+        stage('Build Image')
+                    {
+                        steps
+                            {
+                                 bat "docker build -t dockima:${BUILD_NUMBER} ."
+                            }
                     }
-                }
+
+        stage("Cleaning Previous Deployment"){
+            steps{
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            bat "docker stop assignmentdevcontainer"
+                            bat "docker rm -f assignmentdevcontainer"
+                        }
             }
         }
-        stage("Quality Gate") {
-            steps {
-                timeout(time: 1, unit: 'HOURS') {
-                    // Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
-                    // true = set pipeline to UNSTABLE, false = don't
-                    waitForQualityGate abortPipeline: true
+        stage ("Docker Deployment")
+        {
+        steps
+        {
+        bat "docker run --name assignmentdevcontainer -d -p 9056:8080 dockima:${BUILD_NUMBER}"
+        }
+       }
+        stage ("Pushing the image to dockerhub"){
+            steps{
+                script{
+                        docker.withRegistry('https://registry.hub.docker.com', 'DockerHub') { 
+                            bat "docker login -u shilpabains -p quahfm637320!"
+                            bat "docker tag dockima:${BUILD_NUMBER}  shilpabains/dockima:${BUILD_NUMBER}"
+                            bat "docker rmi dockima:${BUILD_NUMBER}"
+                            bat "docker push shilpabains/dockima:${BUILD_NUMBER}"
                 }
             }
-        }
-    }
-}
+        }    
+      }
+    }  
+  }
